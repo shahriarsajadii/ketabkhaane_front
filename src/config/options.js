@@ -1,0 +1,23 @@
+// برچسب فارسی فیلدها (برای نمایش خطاها)
+export const FIELD_LABELS = {
+  title: 'نام کتاب',
+  authors: 'نویسنده',
+  translator: 'مترجم',
+  publisher: 'ناشر',
+  publish_year: 'سال انتشار',
+  categories: 'دسته‌بندی',
+  addresses: 'آدرس‌ها',
+  count: 'تعداد',
+  note: 'توضیحات',
+  isbn: 'شابک',
+  print_series: 'سری چاپ',
+  print_series_date: 'تاریخ سری چاپ',
+  first_print_date: 'چاپ اول',
+  circulation: 'شمارگان',
+  dewey_classification: 'رده‌بندی دیویی',
+  national_bibliography_number: 'شماره کتاب‌شناسی ملی',
+  name: 'نام',
+  description: 'توضیحات',
+  image: 'عکس',
+  file: 'فایل',
+}
