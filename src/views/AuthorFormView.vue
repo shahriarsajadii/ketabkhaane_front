@@ -165,7 +165,6 @@ const pageDescription = computed(() =>
     : 'نام نویسنده را وارد کنید؛ توضیحات و عکس اختیاری هستند.',
 )
 const breadcrumbs = computed(() => [
-  { label: 'پیشخوان' },
   { label: 'مدیریت کتابخانه' },
   { label: 'نویسنده‌ها', to: '/authors' },
   { label: isEdit.value ? 'ویرایش نویسنده' : 'ثبت نویسنده جدید' },

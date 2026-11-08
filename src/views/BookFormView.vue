@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowRight, Check, Info } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowRight, Check, Info, Library } from 'lucide-vue-next'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -13,17 +13,22 @@ import CategoryMultiSelect from '@/components/books/CategoryMultiSelect.vue'
 import CopiesEditor from '@/components/books/CopiesEditor.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
 import ImageUploader from '@/components/books/ImageUploader.vue'
+import NewEntityHints from '@/components/books/NewEntityHints.vue'
+import OpacSearchModal from '@/components/books/OpacSearchModal.vue'
 import { booksApi } from '@/api/books'
 import { authorsApi } from '@/api/authors'
 import { categoriesApi } from '@/api/categories'
 import { publishersApi } from '@/api/publishers'
+import { seriesApi } from '@/api/series'
 import { IMAGE_MAX_MB, MAX_COPIES_UI } from '@/config/app'
 import { useToastStore } from '@/stores/toast'
 import { firstMessage, parseApiError } from '@/utils/errors'
 import { formatDateTime, normalizeDigits, toFa, toFaDigits } from '@/utils/format'
+import { mapOpacDetail } from '@/utils/opac'
 
 const props = defineProps({ id: { type: String, default: null } })
 
+const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
 
@@ -32,18 +37,29 @@ const loading = ref(false)
 const saving = ref(false)
 
 const emptyForm = () => ({
-  title: '', translator: '', publish_year: '', isbn: '', note: '',
+  title: '', translator: '', publish_year: '', isbn: '', page_count: '', note: '',
   print_series: '', print_series_date: '', first_print_date: '', circulation: '',
   dewey_classification: '', national_bibliography_number: '',
+  subject: '',        // موضوع: از کتابخانه‌ی ملی پر می‌شود، فیلد متنی و جدا از دسته‌بندی
+  volume_number: '',  // شماره جلد (برای کتاب‌هایی که بخشی از یک مجموعه‌اند)
 })
 const form = reactive(emptyForm())
 const categoryIds = ref([])
 const authors = ref([])      // [{ id, name }]
 const publisher = ref(null)  // { id, name } | null
+const series = ref(null)     // { id, name } | null — مجموعه (مثلاً «دهخدا»)
 const categoryOptions = ref([])
-const addresses = ref([''])
+
+// نام‌های جدید از کتابخانه‌ی ملی: هنوز ذخیره نشده‌اند و همراه ثبت کتاب در دیتابیس ساخته می‌شوند
+const newAuthors = ref([])      // [string]
+const newPublisher = ref('')    // string
+const newPublisherNames = computed(() => (newPublisher.value ? [newPublisher.value] : []))
+const showOpac = ref(false)
+const emptyCopy = () => ({ address: '', is_loaned: false, loaned_to: '' })
+const copies = ref([emptyCopy()]) // هر نسخه: { address, is_loaned, loaned_to }
 const errors = reactive({})
 const addressErrors = ref({})
+const loanErrors = ref({})
 const loaded = ref(null) // کتاب بارگذاری‌شده (حالت ویرایش)
 
 const image = reactive({ url: null, file: null, preview: null, remove: false, error: '' })
@@ -54,6 +70,19 @@ const fetchAuthors = (params) => authorsApi.list(params)
 const fetchPublishers = (params) => publishersApi.list(params)
 const createAuthor = (name) => authorsApi.create({ name })
 const createPublisher = (name) => publishersApi.create({ name })
+// مجموعه (مثلاً «دهخدا»): لیست کوچک است، جستجو سمت کلاینت انجام می‌شود
+async function fetchSeries({ search = '' } = {}) {
+  const res = await seriesApi.list()
+  let items = res.items.map((s) => ({ id: s.id, name: s.title }))
+  const q = search.trim().toLowerCase()
+  if (q) items = items.filter((s) => s.name.toLowerCase().includes(q))
+  return { items }
+}
+async function createSeries(name) {
+  const s = await seriesApi.create({ title: name })
+  return { id: s.id, name: s.title }
+}
+// دسته‌بندی‌ها از قبل کامل بارگذاری شده‌اند؛ برای پیشنهادِ «مشابه» از همان‌ها استفاده می‌کنیم
 
 // ---------- init ----------
 function resetState() {
@@ -61,7 +90,10 @@ function resetState() {
   categoryIds.value = []
   authors.value = []
   publisher.value = null
-  addresses.value = ['']
+  series.value = null
+  newAuthors.value = []
+  newPublisher.value = ''
+  copies.value = [emptyCopy()]
   clearErrors()
   loaded.value = null
   revokePreview()
@@ -82,6 +114,7 @@ function fill(book) {
   form.translator = book.translator || ''
   form.publish_year = book.publish_year ? String(book.publish_year) : ''
   form.isbn = book.isbn || ''
+  form.page_count = book.page_count ? String(book.page_count) : ''
   form.note = book.note || ''
   form.print_series = book.print_series ? String(book.print_series) : ''
   form.print_series_date = book.print_series_date || ''
@@ -89,10 +122,17 @@ function fill(book) {
   form.circulation = book.circulation ? String(book.circulation) : ''
   form.dewey_classification = book.dewey_classification || ''
   form.national_bibliography_number = book.national_bibliography_number || ''
+  form.subject = book.subject || ''
+  form.volume_number = book.volume_number ? String(book.volume_number) : ''
   authors.value = book.authors ? [...book.authors] : []
   publisher.value = book.publisher || null
+  series.value = book.series ? { id: book.series.id, name: book.series.title } : null
   categoryIds.value = (book.categories || []).map((c) => c.id)
-  addresses.value = book.addresses?.length ? [...book.addresses] : ['']
+  copies.value = book.copies?.length
+      ? book.copies.map((c) => ({ address: c.address, is_loaned: !!c.is_loaned, loaned_to: c.loaned_to || '' }))
+      : book.addresses?.length
+          ? book.addresses.map((a) => ({ address: a, is_loaned: false, loaned_to: '' }))
+          : [emptyCopy()]
   image.url = book.image || null
 }
 
@@ -105,6 +145,10 @@ async function init() {
       fill(book)
     } else {
       await loadCategories()
+      if (route.query.source === 'nlai') {
+        showOpac.value = true
+        router.replace({ query: {} }) // با refresh دوباره باز نشود
+      }
     }
   } catch (e) {
     const err = parseApiError(e)
@@ -115,6 +159,50 @@ async function init() {
   }
 }
 watch(() => props.id, init, { immediate: true })
+
+// ---------- کتابخانه‌ی ملی ----------
+function applyOpac(detail) {
+  const d = mapOpacDetail(detail)
+  clearErrors()
+
+  if (d.title) form.title = d.title
+  if (d.isbn) form.isbn = d.isbn
+  if (d.publish_year) form.publish_year = String(d.publish_year)
+  if (d.page_count) form.page_count = String(d.page_count)
+  if (d.dewey_classification) form.dewey_classification = d.dewey_classification
+  if (d.national_bibliography_number) form.national_bibliography_number = d.national_bibliography_number
+  // موضوع: فیلد متنی و جدا از دسته‌بندی؛ همان‌جا ذخیره می‌شود (نیازی به ساخت موجودیت جدید نیست)
+  if (d.subject) form.subject = d.subject
+
+  // نویسنده / ناشر: فقط پیش‌نویس می‌شوند (ذخیره نمی‌شوند) و NewEntityHints مشابه‌هایشان را پیدا می‌کند
+  if (d.authors.length) {
+    authors.value = []
+    newAuthors.value = d.authors
+  }
+  if (d.publisher) {
+    publisher.value = null
+    newPublisher.value = d.publisher
+  }
+  // دسته‌بندی را کتابخانه‌ی ملی پر نمی‌کند؛ دسته‌بندی را خود کاربر از لیست بالا انتخاب می‌کند
+
+  toast.success('اطلاعات از کتابخانه ملی دریافت شد. نویسنده و ناشرِ جدید پس از ثبت کتاب ذخیره می‌شوند.')
+}
+
+const dropName = (list, name) => list.value.filter((n) => n !== name)
+
+function pickAuthor(name, item) {
+  newAuthors.value = dropName(newAuthors, name)
+  if (!authors.value.some((a) => a.id === item.id)) authors.value = [...authors.value, { id: item.id, name: item.name }]
+}
+const removeAuthor = (name) => { newAuthors.value = dropName(newAuthors, name) }
+
+function pickPublisher(name, item) {
+  newPublisher.value = ''
+  publisher.value = { id: item.id, name: item.name }
+}
+const removePublisher = () => { newPublisher.value = '' }
+// اگر کاربر خودش ناشری انتخاب کرد، نام پیش‌نویسِ ناشر دیگر لازم نیست
+watch(publisher, (value) => { if (value) newPublisher.value = '' })
 
 // ---------- image ----------
 function revokePreview() {
@@ -149,33 +237,41 @@ function onImageRemove() {
 function clearErrors() {
   Object.keys(errors).forEach((k) => delete errors[k])
   addressErrors.value = {}
+  loanErrors.value = {}
 }
 
 function validate() {
   clearErrors()
   if (!form.title.trim()) errors.title = 'عنوان کتاب الزامی است.'
-  if (!authors.value.length) errors.authors = 'حداقل یک نویسنده انتخاب کنید.'
+  if (!authors.value.length && !newAuthors.value.length) errors.authors = 'حداقل یک نویسنده انتخاب کنید.'
 
   const year = Number(normalizeDigits(form.publish_year))
   if (form.publish_year && (year < 1 || year > 2100)) errors.publish_year = 'سال انتشار معتبر نیست.'
   const printSeries = Number(normalizeDigits(form.print_series))
   if (form.print_series && (printSeries < 1 || printSeries > 32767)) errors.print_series = 'سری چاپ معتبر نیست.'
+  const pageCount = Number(normalizeDigits(form.page_count))
+  if (form.page_count && (pageCount < 1 || pageCount > 100000)) errors.page_count = 'تعداد صفحه معتبر نیست.'
   const circulation = Number(normalizeDigits(form.circulation))
   if (form.circulation && (circulation < 1 || circulation > 2147483647)) errors.circulation = 'شمارگان معتبر نیست.'
+  const volumeNumber = Number(normalizeDigits(form.volume_number))
+  if (form.volume_number && (volumeNumber < 1 || volumeNumber > 100000)) errors.volume_number = 'شماره جلد معتبر نیست.'
 
-  const missing = {}
-  addresses.value.forEach((a, i) => {
-    if (!/^\d{2}-\d{2}$/.test(a.trim())) missing[i] = `قفسه و ردیف نسخه ${toFa(i + 1)} را انتخاب کنید.`
+  const missingAddress = {}
+  const missingLoan = {}
+  copies.value.forEach((c, i) => {
+    if (!/^\d{2}-\d{2}$/.test((c.address || '').trim())) missingAddress[i] = `قفسه و ردیف نسخه ${toFa(i + 1)} را انتخاب کنید.`
+    if (c.is_loaned && !(c.loaned_to || '').trim()) missingLoan[i] = 'نام امانت‌گیرنده را وارد کنید.'
   })
-  addressErrors.value = missing
+  addressErrors.value = missingAddress
+  loanErrors.value = missingLoan
 
-  return !Object.keys(errors).length && !Object.keys(missing).length
+  return !Object.keys(errors).length && !Object.keys(missingAddress).length && !Object.keys(missingLoan).length
 }
 
 function applyServerErrors(fields) {
   clearErrors()
   for (const [key, value] of Object.entries(fields)) {
-    if (key === 'addresses' && value && !Array.isArray(value) && typeof value === 'object') {
+    if ((key === 'addresses' || key === 'copies') && value && !Array.isArray(value) && typeof value === 'object') {
       const map = {}
       for (const [i, v] of Object.entries(value)) map[i] = firstMessage(v)
       addressErrors.value = map
@@ -201,7 +297,11 @@ function buildPayload() {
     publisher: publisher.value ? publisher.value.id : null,
     publish_year: num(form.publish_year),
     isbn: form.isbn.trim(),
+    page_count: num(form.page_count),
     note: form.note.trim(),
+    subject: form.subject.trim(),
+    series: series.value ? series.value.id : null,
+    volume_number: num(form.volume_number),
     print_series: num(form.print_series),
     print_series_date: form.print_series_date.trim(),
     first_print_date: form.first_print_date.trim(),
@@ -209,8 +309,14 @@ function buildPayload() {
     dewey_classification: form.dewey_classification.trim(),
     national_bibliography_number: form.national_bibliography_number.trim(),
     categories: categoryIds.value,
-    count: addresses.value.length,
-    addresses: addresses.value.map((a) => a.trim()),
+    // نام‌های جدید؛ سرور همزمان با ساخت کتاب، نویسنده/ناشر جدید را هم می‌سازد
+    new_authors: newAuthors.value,
+    new_publisher: publisher.value ? '' : newPublisher.value,
+    copies: copies.value.map((c) => ({
+      address: c.address.trim(),
+      is_loaned: !!c.is_loaned,
+      loaned_to: c.is_loaned ? c.loaned_to.trim() : '',
+    })),
   }
 }
 
@@ -250,12 +356,11 @@ async function submit() {
 // ---------- view helpers ----------
 const pageTitle = computed(() => (isEdit.value ? 'ویرایش کتاب' : 'ثبت کتاب جدید'))
 const pageDescription = computed(() =>
-  isEdit.value
-    ? `اطلاعات و محل نگهداری نسخه‌های «${loaded.value?.title || ''}» را به‌روزرسانی کنید.`
-    : 'اطلاعات کتاب و محل نگهداری هر نسخه را وارد کنید.',
+    isEdit.value
+        ? `اطلاعات و محل نگهداری نسخه‌های «${loaded.value?.title || ''}» را به‌روزرسانی کنید.`
+        : 'اطلاعات کتاب و محل نگهداری هر نسخه را وارد کنید.',
 )
 const breadcrumbs = computed(() => [
-  { label: 'پیشخوان' },
   { label: 'مدیریت کتابخانه' },
   { label: 'کتاب‌ها', to: '/books' },
   { label: isEdit.value ? 'ویرایش کتاب' : 'ثبت کتاب جدید' },
@@ -266,6 +371,10 @@ const breadcrumbs = computed(() => [
   <div>
     <PageHeader :title="pageTitle" :description="pageDescription" :breadcrumbs="breadcrumbs">
       <template #actions>
+        <BaseButton v-if="!isEdit" @click="showOpac = true">
+          <template #icon><Library /></template>
+          پر کردن از کتابخانه ملی
+        </BaseButton>
         <BaseButton to="/books">
           <template #icon><ArrowRight /></template>
           بازگشت به فهرست
@@ -283,42 +392,80 @@ const breadcrumbs = computed(() => [
               <BaseField label="عنوان کتاب" required for-id="title" :error="errors.title">
                 <BaseInput id="title" v-model="form.title" :invalid="!!errors.title" placeholder="عنوان کامل کتاب را وارد کنید" maxlength="255" />
               </BaseField>
-              <BaseField label="نویسنده" required :error="errors.authors">
-                <SearchableSelect
-                  v-model="authors"
-                  multiple
-                  noun="نویسنده"
-                  placeholder="انتخاب نویسنده"
-                  search-placeholder="جستجوی نویسنده یا نوشتن نام جدید…"
-                  aria-label="نویسنده"
-                  :fetcher="fetchAuthors"
-                  :creator="createAuthor"
-                  :invalid="!!errors.authors"
-                />
-              </BaseField>
               <BaseField label="مترجم" for-id="translator" :error="errors.translator">
                 <BaseInput id="translator" v-model="form.translator" :invalid="!!errors.translator" placeholder="نام مترجم در صورت وجود" maxlength="255" />
               </BaseField>
-              <BaseField label="ناشر" :error="errors.publisher">
+
+              <!-- نویسنده + Hint: یک سطر کامل -->
+              <BaseField class="grid__full" label="نویسنده" required :error="errors.authors">
                 <SearchableSelect
-                  v-model="publisher"
-                  noun="ناشر"
-                  placeholder="انتخاب ناشر"
-                  search-placeholder="جستجوی ناشر یا نوشتن نام جدید…"
-                  aria-label="ناشر"
-                  :fetcher="fetchPublishers"
-                  :creator="createPublisher"
-                  :invalid="!!errors.publisher"
+                    v-model="authors"
+                    multiple
+                    noun="نویسنده"
+                    placeholder="انتخاب نویسنده"
+                    search-placeholder="جستجوی نویسنده یا نوشتن نام جدید…"
+                    aria-label="نویسنده"
+                    :fetcher="fetchAuthors"
+                    :creator="createAuthor"
+                    :invalid="!!errors.authors"
+                />
+                <NewEntityHints
+                    :names="newAuthors"
+                    noun="نویسنده"
+                    :fetcher="fetchAuthors"
+                    @pick="pickAuthor"
+                    @remove="removeAuthor"
                 />
               </BaseField>
-            </div>
 
-            <hr class="divider" />
+              <!-- ناشر + Hint: یک سطر کامل -->
+              <BaseField class="grid__full" label="ناشر" :error="errors.publisher || errors.new_publisher">
+                <SearchableSelect
+                    v-model="publisher"
+                    noun="ناشر"
+                    placeholder="انتخاب ناشر"
+                    search-placeholder="جستجوی ناشر یا نوشتن نام جدید…"
+                    aria-label="ناشر"
+                    :fetcher="fetchPublishers"
+                    :creator="createPublisher"
+                    :invalid="!!errors.publisher"
+                />
+                <NewEntityHints
+                    :names="newPublisherNames"
+                    noun="ناشر"
+                    :fetcher="fetchPublishers"
+                    @pick="pickPublisher"
+                    @remove="removePublisher"
+                />
+              </BaseField>
 
-            <div class="grid grid--3">
-              <BaseField label="دسته‌بندی" :error="errors.categories">
+              <!-- دسته‌بندی: کاملاً دستی و با انتخاب/افزودن خود کاربر -->
+              <BaseField class="grid__full" label="دسته‌بندی" :error="errors.categories">
                 <CategoryMultiSelect v-model="categoryIds" :options="categoryOptions" :invalid="!!errors.categories" @created="categoryOptions.push($event)" />
               </BaseField>
+
+              <!-- موضوع: فیلد متنی که از کتابخانه‌ی ملی پر می‌شود (جدا از دسته‌بندی) -->
+              <BaseField class="grid__full" label="موضوع" for-id="subject" :error="errors.subject" hint="از کتابخانه‌ی ملی پر می‌شود؛ در صورت نیاز قابل ویرایش است.">
+                <BaseTextarea id="subject" v-model="form.subject" :rows="2" :invalid="!!errors.subject" placeholder="مثلاً: زبان فارسی -- واژه‌نامه‌ها" />
+              </BaseField>
+
+              <!-- مجموعه: برای کتاب‌هایی که جلدهای یک مجموعه‌اند (مثلاً دهخدا) -->
+              <BaseField label="مجموعه" :error="errors.series">
+                <SearchableSelect
+                    v-model="series"
+                    noun="مجموعه"
+                    placeholder="اگر بخشی از یک مجموعه است انتخاب کنید"
+                    search-placeholder="جستجوی مجموعه یا نوشتن نام جدید…"
+                    aria-label="مجموعه"
+                    :fetcher="fetchSeries"
+                    :creator="createSeries"
+                    :invalid="!!errors.series"
+                />
+              </BaseField>
+              <BaseField label="شماره جلد" for-id="volume_number" :error="errors.volume_number">
+                <BaseInput id="volume_number" v-model="form.volume_number" numeric :invalid="!!errors.volume_number" placeholder="مثلاً ۱۸" maxlength="5" :disabled="!series" />
+              </BaseField>
+
               <BaseField label="سال انتشار" for-id="year" :error="errors.publish_year">
                 <BaseInput id="year" v-model="form.publish_year" numeric :invalid="!!errors.publish_year" placeholder="مثلاً ۱۳۹۹" maxlength="4" />
               </BaseField>
@@ -342,6 +489,9 @@ const breadcrumbs = computed(() => [
               <BaseField label="شمارگان" for-id="circulation" :error="errors.circulation">
                 <BaseInput id="circulation" v-model="form.circulation" numeric :invalid="!!errors.circulation" placeholder="مثلاً ۱۱۰۰" maxlength="10" />
               </BaseField>
+              <BaseField label="تعداد صفحه" for-id="page_count" :error="errors.page_count">
+                <BaseInput id="page_count" v-model="form.page_count" numeric :invalid="!!errors.page_count" placeholder="مثلاً ۲۵۰" maxlength="6" />
+              </BaseField>
               <BaseField label="رده‌بندی دیویی" for-id="dewey" :error="errors.dewey_classification">
                 <BaseInput id="dewey" v-model="form.dewey_classification" class="bidi" :invalid="!!errors.dewey_classification" placeholder="مثلاً 891.55" maxlength="50" />
               </BaseField>
@@ -351,7 +501,7 @@ const breadcrumbs = computed(() => [
             </div>
           </BaseCard>
 
-          <CopiesEditor v-model="addresses" :errors="addressErrors" :list-error="errors.addresses" :max="MAX_COPIES_UI" />
+          <CopiesEditor v-model="copies" :errors="addressErrors" :loan-errors="loanErrors" :list-error="errors.addresses || errors.copies" :max="MAX_COPIES_UI" />
 
           <BaseCard title="درباره کتاب">
             <BaseField label="توضیحات" for-id="note" :error="errors.note">
@@ -369,6 +519,8 @@ const breadcrumbs = computed(() => [
             <h3 class="guide__title"><Info /> راهنمای ثبت اطلاعات</h3>
             <p>عنوان، نویسنده، تعداد نسخه و محل نگهداری (قفسه و ردیف) هر نسخه الزامی است. اگر نویسنده یا ناشر در لیست نبود، نامش را تایپ کنید و «افزودن» را بزنید.</p>
             <hr class="divider" />
+            <p v-if="!isEdit">با «پر کردن از کتابخانه ملی» می‌توانید اطلاعات کتاب را با شابک یا عنوان بگیرید. نویسنده و ناشرِ دریافت‌شده تا زمان ثبت کتاب ذخیره نمی‌شوند و می‌توانید به‌جای آن‌ها یکی از موارد مشابهِ موجود را انتخاب کنید. موضوع در فیلد جداگانه‌ای پر می‌شود و دسته‌بندی را خودتان انتخاب می‌کنید.</p>
+            <hr v-if="!isEdit" class="divider" />
             <p>برای کتاب‌های ترجمه‌شده، نام مترجم را هم وارد کنید. سال انتشار را مطابق شناسنامه‌ی کتاب بنویسید.</p>
             <template v-if="isEdit && loaded">
               <hr class="divider" />
@@ -390,6 +542,8 @@ const breadcrumbs = computed(() => [
         </div>
       </div>
     </form>
+
+    <OpacSearchModal v-model="showOpac" @picked="applyOpac" />
   </div>
 </template>
 
@@ -403,6 +557,7 @@ const breadcrumbs = computed(() => [
 .grid { display: grid; gap: var(--space-4) var(--space-5); }
 .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid__full { grid-column: 1 / -1; }
 .stack { display: flex; flex-direction: column; gap: var(--space-5); }
 .divider { margin: var(--space-5) 0; border: 0; border-top: 1px solid var(--color-border); }
 
@@ -423,5 +578,8 @@ const breadcrumbs = computed(() => [
 }
 @media (max-width: 560px) {
   .grid--2, .grid--3 { grid-template-columns: 1fr; }
+  .bar { flex-direction: column; align-items: stretch; }
+  .bar__actions { flex-direction: column-reverse; }
+  .bar__actions > :deep(*) { width: 100%; }
 }
 </style>

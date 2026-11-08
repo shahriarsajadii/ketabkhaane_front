@@ -23,19 +23,19 @@ function onKey(e) {
 }
 
 watch(
-  () => props.modelValue,
-  async (open) => {
-    if (open) {
-      document.addEventListener('keydown', onKey)
-      document.body.style.overflow = 'hidden'
-      await nextTick()
-      dialog.value?.focus()
-    } else {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  },
-  { immediate: true },
+    () => props.modelValue,
+    async (open) => {
+      if (open) {
+        document.addEventListener('keydown', onKey)
+        document.body.style.overflow = 'hidden'
+        await nextTick()
+        dialog.value?.focus()
+      } else {
+        document.removeEventListener('keydown', onKey)
+        document.body.style.overflow = ''
+      }
+    },
+    { immediate: true },
 )
 
 onBeforeUnmount(() => {
@@ -49,13 +49,13 @@ onBeforeUnmount(() => {
     <Transition name="modal">
       <div v-if="modelValue" class="backdrop" @mousedown.self="close">
         <div
-          ref="dialog"
-          class="modal"
-          :class="`modal--${size}`"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="title"
-          tabindex="-1"
+            ref="dialog"
+            class="modal"
+            :class="`modal--${size}`"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="title"
+            tabindex="-1"
         >
           <button v-if="closable" type="button" class="modal__close" aria-label="بستن" @click="close">
             <X />
@@ -93,6 +93,7 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
@@ -127,6 +128,7 @@ onBeforeUnmount(() => {
 .modal__body { padding: var(--space-5) var(--space-6); overflow-y: auto; }
 .modal__footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
@@ -137,4 +139,14 @@ onBeforeUnmount(() => {
 .modal-enter-active .modal, .modal-leave-active .modal { transition: transform var(--transition); }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-from .modal, .modal-leave-to .modal { transform: translateY(8px) scale(0.98); }
+
+@media (max-width: 560px) {
+  .backdrop { padding: var(--space-3); }
+  .modal__header { padding: var(--space-5) var(--space-4) 0; padding-inline-end: var(--space-10); }
+  .modal__body { padding: var(--space-4); }
+  .modal__footer { padding: var(--space-3) var(--space-4); }
+  /* دکمه‌های فوتر در موبایل تمام‌عرض و زیر هم */
+  .modal__footer { flex-direction: column-reverse; }
+  .modal__footer > :deep(*) { width: 100%; }
+}
 </style>

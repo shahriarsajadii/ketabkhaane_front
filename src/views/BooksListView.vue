@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Download, Pencil, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-vue-next'
+import { Download, Library, Pencil, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-vue-next'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -62,10 +62,10 @@ watch(searchText, (value) => {
   searchTimer = setTimeout(() => setQuery({ search: value.trim(), page: undefined }), SEARCH_DEBOUNCE_MS)
 })
 watch(
-  () => route.query.search,
-  (value) => {
-    if ((value || '') !== searchText.value.trim()) searchText.value = value || ''
-  },
+    () => route.query.search,
+    (value) => {
+      if ((value || '') !== searchText.value.trim()) searchText.value = value || ''
+    },
 )
 onBeforeUnmount(() => clearTimeout(searchTimer))
 
@@ -218,9 +218,9 @@ const rangeText = computed(() => {
 <template>
   <div>
     <PageHeader
-      title="فهرست کتاب‌ها"
-      description="کتاب‌های کتابخانه را جستجو، ثبت و مدیریت کنید."
-      :breadcrumbs="[{ label: 'مدیریت کتابخانه' }, { label: 'کتاب‌ها' }]"
+        title="فهرست کتاب‌ها"
+        description="کتاب‌های کتابخانه را جستجو، ثبت و مدیریت کنید."
+        :breadcrumbs="[{ label: 'مدیریت کتابخانه' }, { label: 'کتاب‌ها' }]"
     >
       <template #actions>
         <BaseButton :loading="exporting" @click="exportExcel">
@@ -230,6 +230,10 @@ const rangeText = computed(() => {
         <BaseButton @click="showUpload = true">
           <template #icon><Upload /></template>
           آپلود اکسل
+        </BaseButton>
+        <BaseButton to="/books/new?source=nlai">
+          <template #icon><Library /></template>
+          ثبت کتاب از کتابخانه ملی
         </BaseButton>
         <BaseButton variant="primary" to="/books/new">
           <template #icon><Plus /></template>
@@ -275,51 +279,55 @@ const rangeText = computed(() => {
       <div class="table-wrap" :class="{ 'is-loading': loading }">
         <table class="table">
           <thead>
-            <tr>
-              <th class="col-check"><BaseCheckbox :model-value="allSelected" :indeterminate="someSelected" aria-label="انتخاب همه" @update:model-value="toggleAll" /></th>
-              <th>نام کتاب</th>
-              <th>نویسنده</th>
-              <th>ناشر</th>
-              <th>دسته‌بندی</th>
-              <th class="col-num">تعداد نسخه</th>
-              <th class="col-actions">عملیات</th>
-            </tr>
+          <tr>
+            <th class="col-check"><BaseCheckbox :model-value="allSelected" :indeterminate="someSelected" aria-label="انتخاب همه" @update:model-value="toggleAll" /></th>
+            <th>نام کتاب</th>
+            <th>نویسنده</th>
+            <th>ناشر</th>
+            <th>دسته‌بندی</th>
+            <th class="col-num">تعداد نسخه</th>
+            <th class="col-actions">عملیات</th>
+          </tr>
           </thead>
           <tbody>
-            <tr v-for="b in items" :key="b.id">
-              <td class="col-check"><BaseCheckbox :model-value="selected.has(b.id)" :aria-label="`انتخاب ${b.title}`" @update:model-value="toggleOne(b.id, $event)" /></td>
-              <td>
-                <div class="book">
-                  <BookCover :src="b.image" :alt="b.title" size="sm" />
-                  <div class="book__text">
-                    <RouterLink :to="`/books/${b.id}/edit`" class="book__title">{{ b.title }}</RouterLink>
-                    <span class="book__code">کد کتاب: {{ toFaDigits(b.id) }}</span>
+          <tr v-for="b in items" :key="b.id">
+            <td class="col-check"><BaseCheckbox :model-value="selected.has(b.id)" :aria-label="`انتخاب ${b.title}`" @update:model-value="toggleOne(b.id, $event)" /></td>
+            <td>
+              <div class="book">
+                <BookCover :src="b.image" :alt="b.title" size="sm" />
+                <div class="book__text">
+                  <RouterLink :to="`/books/${b.id}/edit`" class="book__title">{{ b.title }}</RouterLink>
+                  <span class="book__code">کد کتاب: {{ toFaDigits(b.id) }}</span>
+                  <div v-if="b.series || (b.copies || []).some((c) => c.is_loaned)" class="book__badges">
+                    <BaseBadge v-if="b.series">{{ b.series.title }}<template v-if="b.volume_number"> — جلد {{ toFaDigits(b.volume_number) }}</template></BaseBadge>
+                    <BaseBadge v-if="(b.copies || []).some((c) => c.is_loaned)" tone="warning">امانت داده شده</BaseBadge>
                   </div>
                 </div>
-              </td>
-              <td>{{ b.authors.map((a) => a.name).join('، ') || '—' }}</td>
-              <td>{{ b.publisher?.name || '—' }}</td>
-              <td>
-                <div v-if="b.categories.length" class="chips">
-                  <BaseBadge>{{ b.categories[0].title }}</BaseBadge>
-                  <BaseBadge v-if="b.categories.length > 1">+{{ toFa(b.categories.length - 1) }}</BaseBadge>
-                </div>
-                <span v-else class="muted">—</span>
-              </td>
-              <td class="col-num">{{ toFa(b.count) }}</td>
-              <td class="col-actions">
-                <div class="actions">
-                  <BaseButton variant="ghost" size="sm" :to="`/books/${b.id}/edit`">
-                    <template #icon><Pencil /></template>
-                    ویرایش
-                  </BaseButton>
-                  <BaseButton variant="ghost" size="sm" @click="askDelete([b])">
-                    <template #icon><Trash2 /></template>
-                    حذف
-                  </BaseButton>
-                </div>
-              </td>
-            </tr>
+              </div>
+            </td>
+            <td>{{ b.authors.map((a) => a.name).join('، ') || '—' }}</td>
+            <td>{{ b.publisher?.name || '—' }}</td>
+            <td>
+              <div v-if="b.categories.length" class="chips">
+                <BaseBadge>{{ b.categories[0].title }}</BaseBadge>
+                <BaseBadge v-if="b.categories.length > 1">+{{ toFa(b.categories.length - 1) }}</BaseBadge>
+              </div>
+              <span v-else class="muted">—</span>
+            </td>
+            <td class="col-num">{{ toFa(b.count) }}</td>
+            <td class="col-actions">
+              <div class="actions">
+                <BaseButton variant="ghost" size="sm" :to="`/books/${b.id}/edit`">
+                  <template #icon><Pencil /></template>
+                  ویرایش
+                </BaseButton>
+                <BaseButton variant="ghost" size="sm" @click="askDelete([b])">
+                  <template #icon><Trash2 /></template>
+                  حذف
+                </BaseButton>
+              </div>
+            </td>
+          </tr>
           </tbody>
         </table>
 
@@ -378,6 +386,7 @@ const rangeText = computed(() => {
 .book__title { font-weight: var(--weight-bold); }
 .book__title:hover { text-decoration: underline; }
 .book__code { font-size: var(--text-xs); color: var(--color-text-subtle); }
+.book__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: 2px; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .actions { display: flex; gap: var(--space-1); }
 
@@ -390,5 +399,11 @@ const rangeText = computed(() => {
 @media (max-width: 900px) {
   .filters { grid-template-columns: 1fr 1fr; }
   .filters__search { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .filters { grid-template-columns: 1fr; padding: var(--space-4); }
+  .stats__counts { flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+  .bulk { flex-wrap: wrap; gap: var(--space-2); padding-inline: var(--space-4); }
+  .footer { flex-direction: column; align-items: center; padding-inline: var(--space-4); }
 }
 </style>

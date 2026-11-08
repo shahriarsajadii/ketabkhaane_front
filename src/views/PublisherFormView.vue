@@ -162,7 +162,6 @@ const pageDescription = computed(() =>
     : 'نام و عکس (لوگوی) ناشر را وارد کنید.',
 )
 const breadcrumbs = computed(() => [
-  { label: 'پیشخوان' },
   { label: 'مدیریت کتابخانه' },
   { label: 'ناشران', to: '/publishers' },
   { label: isEdit.value ? 'ویرایش ناشر' : 'ثبت ناشر جدید' },

@@ -10,9 +10,11 @@ import { useAuthStore } from '@/stores/auth'
 const routes = [
   {
     path: '/',
-    redirect: () => ({ name: 'books' }),
+    redirect: () => ({ name: 'dashboard' }),
   },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { layout: 'public', guestOnly: true } },
+
+  { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { layout: 'app', requiresAuth: true } },
 
   { path: '/books', name: 'books', component: () => import('@/views/BooksListView.vue'), meta: { layout: 'app', requiresAuth: true } },
   { path: '/books/new', name: 'book-new', component: () => import('@/views/BookFormView.vue'), props: true, meta: { layout: 'app', requiresAuth: true } },
@@ -27,6 +29,8 @@ const routes = [
   { path: '/publishers/:id(\\d+)/edit', name: 'publisher-edit', component: () => import('@/views/PublisherFormView.vue'), props: true, meta: { layout: 'app', requiresAuth: true } },
 
   { path: '/members', name: 'members', component: () => import('@/views/MembersView.vue'), meta: { layout: 'app', requiresAuth: true } },
+
+  { path: '/categories', name: 'categories', component: () => import('@/views/CategoriesListView.vue'), meta: { layout: 'app', requiresAuth: true } },
 
   { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue'), meta: { layout: 'public' } },
 ]

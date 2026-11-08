@@ -40,4 +40,20 @@ export const booksApi = {
 
   exportExcel: (params) =>
     http.get('/books/export/', { params: clean(params), responseType: 'blob' }).then((r) => r.data),
+
+  // ---------- کتابخانه‌ی ملی ----------
+  // type: 'shabak' | 'title'  →  [{ title, author, opac_id, publish_date, detail_url }]
+  // اگر چیزی پیدا نشود سرور 404 می‌دهد؛ اینجا به لیست خالی تبدیلش می‌کنیم.
+  searchOpac: ({ type, value }) =>
+    http
+      .post('/books/search_by_shabak/', { type, value })
+      .then((r) => r.data.data || [])
+      .catch((e) => {
+        if (e?.response?.status === 404) return []
+        throw e
+      }),
+
+  // جزئیات کامل یک کتاب از کتابخانه‌ی ملی
+  getOpacBook: (opacId) =>
+    http.post('/books/get_by_opac_id/', { opac_book_id: opacId }).then((r) => r.data.data),
 }
