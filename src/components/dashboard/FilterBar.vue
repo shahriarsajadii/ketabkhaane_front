@@ -72,7 +72,7 @@ const yearToInput = computed({
 
 // کلاس دکمه‌های تاگل امانت (رشته‌ی کامل تا Tailwind همه را اسکن کند)
 const loanBtnBase = 'flex-1 sm:flex-none h-9 px-3 text-xs whitespace-nowrap border-0 border-s border-[color:var(--color-border-strong)] first:border-s-0'
-const loanBtnOn = 'bg-[var(--color-primary)] text-white'
+const loanBtnOn = 'bg-ui-primary text-ui-on-primary'
 const loanBtnOff = 'bg-[var(--color-surface)]'
 </script>
 

@@ -61,7 +61,7 @@ const btnBase = 'flex items-center justify-between gap-2 w-full h-9 px-3 border 
 const btnIdle = 'bg-[var(--color-surface)] border-[color:var(--color-border-strong)]'
 const btnActive = 'bg-[var(--color-primary-soft)] border-[color:var(--color-primary)] pe-9'
 const checkBase = 'grid place-items-center shrink-0 w-[1.05rem] h-[1.05rem] border rounded-sm [&_svg]:w-3 [&_svg]:h-3'
-const checkOn = 'bg-[var(--color-primary)] border-[color:var(--color-primary)] text-white'
+const checkOn = 'bg-ui-primary border-ui-primary text-ui-on-primary'
 const checkOff = 'border-[color:var(--color-border-strong)]'
 </script>
 

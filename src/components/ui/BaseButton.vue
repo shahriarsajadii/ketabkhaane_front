@@ -64,7 +64,7 @@ const attrs = computed(() =>
 .btn--ghost { background: transparent; color: var(--color-text-muted); padding-inline: var(--space-2); }
 .btn--ghost:hover:not(:disabled) { background: var(--color-surface-muted); color: var(--color-text); }
 
-.btn--danger { background: var(--color-danger); color: #fff; }
+.btn--danger { background: var(--color-danger); color: var(--color-on-danger); }
 .btn--danger:hover:not(:disabled) { filter: brightness(0.92); }
 
 .btn:disabled { opacity: 0.5; }

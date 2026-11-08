@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { LogOut, Menu, X } from 'lucide-vue-next'
 import BrandLogo from './BrandLogo.vue'
+import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import { NAV_ITEMS } from '@/config/nav'
 import { useAuthStore } from '@/stores/auth'
 
@@ -47,6 +48,7 @@ async function logout() {
           <LogOut aria-hidden="true" />
           خروج از حساب
         </button>
+        <ThemeToggle />
       </div>
 
       <!-- موبایل: دکمه‌ی منو -->
@@ -77,10 +79,13 @@ async function logout() {
       </nav>
       <div class="panel__user container">
         <span class="user__welcome">خوش اومدی {{ auth.displayName }} :)</span>
-        <button type="button" class="user__logout" @click="logout">
-          <LogOut aria-hidden="true" />
-          خروج از حساب
-        </button>
+        <div class="flex items-center gap-3">
+          <ThemeToggle />
+          <button type="button" class="user__logout" @click="logout">
+            <LogOut aria-hidden="true" />
+            خروج از حساب
+          </button>
+        </div>
       </div>
     </div>
   </header>

@@ -8,10 +8,7 @@ import { useAuthStore } from '@/stores/auth'
  */
 
 const routes = [
-  {
-    path: '/',
-    redirect: () => ({ name: 'dashboard' }),
-  },
+  { path: '/', name: 'landing', component: () => import('@/views/LandingView.vue'), meta: { layout: 'landing' } },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { layout: 'public', guestOnly: true } },
 
   { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { layout: 'app', requiresAuth: true } },

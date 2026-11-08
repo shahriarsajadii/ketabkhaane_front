@@ -1,11 +1,49 @@
 @import "tailwindcss";
 
+/* dark: با کلاس `dark` روی <html> (نه فقط تنظیم سیستم) تا دکمه‌ی تم کار کند */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* توکن‌های tokens.css به‌صورت کلاس‌های Tailwind (مثلاً bg-ui-surface text-ui-fg-muted).
+   چون به var(...) وصل‌اند، با تغییر تم خودکار عوض می‌شوند و نیازی به dark: نیست. */
+@theme inline {
+  --color-ui-bg: var(--color-bg);
+  --color-ui-surface: var(--color-surface);
+  --color-ui-surface-muted: var(--color-surface-muted);
+  --color-ui-surface-hover: var(--color-surface-hover);
+  --color-ui-border: var(--color-border);
+  --color-ui-border-strong: var(--color-border-strong);
+  --color-ui-fg: var(--color-text);
+  --color-ui-fg-muted: var(--color-text-muted);
+  --color-ui-fg-subtle: var(--color-text-subtle);
+  --color-ui-primary: var(--color-primary);
+  --color-ui-primary-hover: var(--color-primary-hover);
+  --color-ui-primary-soft: var(--color-primary-soft);
+  --color-ui-on-primary: var(--color-on-primary);
+  --color-ui-danger: var(--color-danger);
+  --color-ui-danger-soft: var(--color-danger-soft);
+  --color-ui-success: var(--color-success);
+  --color-ui-success-soft: var(--color-success-soft);
+  --color-ui-warning: var(--color-warning);
+  --color-ui-warning-soft: var(--color-warning-soft);
+}
+
 
 *,
 *::before,
 *::after { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
+
+/* تغییر نرم رنگ هنگام عوض شدن تم */
+body { transition: background-color 200ms ease, color 200ms ease; }
+
+/* پرکردن خودکار مرورگر در تم تیره زرد/سفید نشود */
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  caret-color: var(--color-text);
+}
 
 body {
   margin: 0;

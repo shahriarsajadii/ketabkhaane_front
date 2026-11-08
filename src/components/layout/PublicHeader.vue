@@ -1,6 +1,7 @@
 <script setup>
 import BrandLogo from './BrandLogo.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -11,6 +12,7 @@ const auth = useAuthStore()
     <div class="public-header__inner container">
       <BrandLogo to="/" />
       <div class="public-header__spacer" />
+      <ThemeToggle />
       <BaseButton v-if="auth.isAuthenticated" variant="primary" to="/books">ورود به کتابخانه</BaseButton>
       <BaseButton v-else variant="primary" to="/login">ورود</BaseButton>
     </div>

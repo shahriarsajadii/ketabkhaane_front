@@ -11,10 +11,12 @@ import App from './App.vue'
 import router from './router'
 import { setUnauthorizedHandler } from './api/http'
 import { useAuthStore } from './stores/auth'
+import { useThemeStore } from './stores/theme'
 
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
+useThemeStore().init()
 
 // refresh هم شکست خورد → کاربر دیگر وارد نیست
 setUnauthorizedHandler(() => {
