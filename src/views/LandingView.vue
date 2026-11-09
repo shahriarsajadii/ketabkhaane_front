@@ -39,7 +39,7 @@ const poemAlt = 'ای آن که کتاب خوامی از من، گر من نده
       </figure>
 
       <div class="stage__text">
-        <h1 class="stage__title">همه‌ی کتاب‌هایت را بشناس، هر نسخه را سر جایش پیدا کن.</h1>
+        <h1 class="stage__title">به کتابخونه ی خودتون خوش اومدین :)</h1>
         <div class="stage__cta">
           <BaseButton variant="primary" size="lg" :to="auth.isAuthenticated ? '/books' : '/login'">
             <template #icon><ArrowLeft /></template>
